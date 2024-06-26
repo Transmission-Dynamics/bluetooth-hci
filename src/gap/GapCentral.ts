@@ -5,7 +5,7 @@ import chalk from "chalk";
 import { AdvData } from "./AdvData.js";
 import { Hci } from "../hci/Hci.js";
 import {
-  DisconnectionCompleteEvent,
+  DisconnectionCompleteEvent as HciDisconnectionCompleteEvent,
   LeAdvEventType,
   LeAdvReport,
   LeChannelSelAlgoEvent,
@@ -36,6 +36,7 @@ import { Att } from "../att/Att.js";
 import { L2CAP } from "../l2cap/L2CAP.js";
 import { ReadTransmitPowerLevelType } from "../hci/HciControlAndBaseband.js";
 import { HciError, HciErrorErrno, makeHciError } from "../hci/HciError.js";
+import { DisconnectionCompleteEvent } from "./GapEvent.js";
 
 export interface GapCentralOptions {
   autoScan?: boolean;
@@ -87,31 +88,39 @@ export interface GapConnectEvent {
 const debug = Debug("bt-hci-gap");
 
 export declare interface GapCentral {
-  on(event: "GapLeAdvReport", listener: (report: GapAdvertReport, raw: LeAdvReport | LeExtAdvReport) => void): this;
-  once(event: "GapLeAdvReport", listener: (report: GapAdvertReport, raw: LeAdvReport | LeExtAdvReport) => void): this;
+  emit(eventName: "GapLeAdvReport", report: GapAdvertReport, raw: LeAdvReport | LeExtAdvReport): boolean;
+  on(eventName: "GapLeAdvReport", listener: (report: GapAdvertReport, raw: LeAdvReport | LeExtAdvReport) => void): this;
+  once(
+    eventName: "GapLeAdvReport",
+    listener: (report: GapAdvertReport, raw: LeAdvReport | LeExtAdvReport) => void,
+  ): this;
   removeListener(
-    event: "GapLeAdvReport",
+    eventName: "GapLeAdvReport",
     listener: (report: GapAdvertReport, raw: LeAdvReport | LeExtAdvReport) => void,
   ): this;
 
-  on(event: "GapLeScanState", listener: (scanning: boolean) => void): this;
-  once(event: "GapLeScanState", listener: (scanning: boolean) => void): this;
-  removeListener(event: "GapLeScanState", listener: (scanning: boolean) => void): this;
+  emit(eventName: "GapLeScanState", scanning: boolean): boolean;
+  on(eventName: "GapLeScanState", listener: (scanning: boolean) => void): this;
+  once(eventName: "GapLeScanState", listener: (scanning: boolean) => void): this;
+  removeListener(eventName: "GapLeScanState", listener: (scanning: boolean) => void): this;
 
-  on(event: "GapConnected", listener: (event: GapConnectEvent) => void): this;
-  once(event: "GapConnected", listener: (event: GapConnectEvent) => void): this;
-  removeListener(event: "GapConnected", listener: (event: GapConnectEvent) => void): this;
+  emit(eventName: "GapConnected", event: GapConnectEvent): boolean;
+  on(eventName: "GapConnected", listener: (event: GapConnectEvent) => void): this;
+  once(eventName: "GapConnected", listener: (event: GapConnectEvent) => void): this;
+  removeListener(eventName: "GapConnected", listener: (event: GapConnectEvent) => void): this;
 
-  on(event: "GapConnectionCancelled", listener: () => void): this;
-  once(event: "GapConnectionCancelled", listener: () => void): this;
-  removeListener(event: "GapConnectionCancelled", listener: () => void): this;
+  emit(eventName: "GapConnectionCancelled"): boolean;
+  on(eventName: "GapConnectionCancelled", listener: () => void): this;
+  once(eventName: "GapConnectionCancelled", listener: () => void): this;
+  removeListener(eventName: "GapConnectionCancelled", listener: () => void): this;
 
-  on(event: "GapDisconnected", listener: (reason: DisconnectionCompleteEvent) => void): this;
-  once(event: "GapDisconnected", listener: (reason: DisconnectionCompleteEvent) => void): this;
-  removeListener(event: "GapDisconnected", listener: (reason: DisconnectionCompleteEvent) => void): this;
+  emit(eventName: "GapDisconnected", event: DisconnectionCompleteEvent): boolean;
+  on(eventName: "GapDisconnected", listener: (reason: DisconnectionCompleteEvent) => void): this;
+  once(eventName: "GapDisconnected", listener: (reason: DisconnectionCompleteEvent) => void): this;
+  removeListener(eventName: "GapDisconnected", listener: (reason: DisconnectionCompleteEvent) => void): this;
 }
 
-interface GapDeviceInfo {
+export interface GapDeviceInfo {
   connComplete?: LeConnectionCompleteEvent | LeEnhConnectionCompleteEvent;
   channelSelectionAlgorithm?: LeChannelSelAlgoEvent;
   versionInformation?: ReadRemoteVersionInformationCompleteEvent;
@@ -577,7 +586,7 @@ export class GapCentral extends EventEmitter {
     }
   };
 
-  private onDisconnectionComplete = (_err: Error | null, event: DisconnectionCompleteEvent) => {
+  private onDisconnectionComplete = (_err: Error | null, event: HciDisconnectionCompleteEvent) => {
     const device = this.connectedDevices.get(event.connectionHandle);
     if (device) {
       this.connectedDevices.delete(event.connectionHandle);
@@ -589,6 +598,6 @@ export class GapCentral extends EventEmitter {
       });
     }
 
-    this.emit("GapDisconnected", event);
+    this.emit("GapDisconnected", { ...event, device: device ?? {} });
   };
 }
